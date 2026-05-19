@@ -28,7 +28,8 @@ class FilamentMediaServiceProvider extends PackageServiceProvider
             ->name('filament-media')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigrations()
+            ->discoversMigrations()
+            ->runsMigrations()
             ->hasCommands(
                 GarbageCollectBlobsCommand::class,
                 MigrateMediaToBlobsCommand::class,
