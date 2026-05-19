@@ -6,6 +6,7 @@ namespace Joranski\FilamentMedia\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Joranski\FilamentMedia\FilamentMediaServiceProvider;
+use Joranski\FilamentMedia\PathGenerators\BlobAwarePathGenerator;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Spatie\MediaLibrary\MediaLibraryServiceProvider;
 
@@ -44,6 +45,7 @@ abstract class TestCase extends Orchestra
         ]);
 
         $app['config']->set('media-library.disk_name', 'public');
+        $app['config']->set('media-library.path_generator', BlobAwarePathGenerator::class);
     }
 
     protected function setUp(): void

@@ -125,6 +125,30 @@ it('resolves auto caption ux to modal when many files are allowed', function ():
     expect($component->resolvedCaptionUx())->toBe(CaptionUx::Modal);
 });
 
+it('defaults to preview conversion from package config', function (): void {
+    expect(MediaUpload::make('media')->getConversion())->toBe('preview');
+});
+
+it('allows per-field conversion to override config default', function (): void {
+    expect(MediaUpload::make('media')->conversion('large')->getConversion())->toBe('large');
+});
+
+it('applyConfiguredConversion respects null config for originals in ui', function (): void {
+    config(['filament-media.default_conversion' => null]);
+
+    $component = MediaUpload::make('media');
+
+    expect($component->getConversion())->toBeNull();
+});
+
+it('configurePanelDefaults applies conversion from config', function (): void {
+    config(['filament-media.default_conversion' => 'large']);
+
+    MediaUpload::configurePanelDefaults();
+
+    expect(MediaUpload::make('media')->getConversion())->toBe('large');
+});
+
 it('resolves auto caption ux to inline for single file fields', function (): void {
     $component = MediaUpload::make('logo')
         ->captions()

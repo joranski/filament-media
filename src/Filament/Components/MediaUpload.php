@@ -98,6 +98,43 @@ class MediaUpload extends SpatieMediaLibraryFileUpload
         return $this->altTextEnabled;
     }
 
+    /**
+     * Register Filament panel-wide defaults for MediaUpload (reorderable, conversion from config, etc.).
+     * Called automatically when `filament-media.panel_defaults.enabled` is true.
+     */
+    public static function configurePanelDefaults(): void
+    {
+        static::configureUsing(function (MediaUpload $component): void {
+            $panelDefaults = config('filament-media.panel_defaults', []);
+
+            if ($panelDefaults['reorderable'] ?? true) {
+                $component->reorderable();
+            }
+
+            if ($panelDefaults['downloadable'] ?? true) {
+                $component->downloadable();
+            }
+
+            if ($panelDefaults['openable'] ?? true) {
+                $component->openable();
+            }
+
+            static::applyConfiguredConversion($component);
+        });
+    }
+
+    /**
+     * Apply {@see config('filament-media.default_conversion')} to any Spatie media upload component.
+     */
+    public static function applyConfiguredConversion(SpatieMediaLibraryFileUpload $component): void
+    {
+        $conversion = config('filament-media.default_conversion');
+
+        if (is_string($conversion) && $conversion !== '') {
+            $component->conversion($conversion);
+        }
+    }
+
     public function resolvedCaptionUx(): CaptionUx
     {
         if ($this->captionUx !== CaptionUx::Auto) {
@@ -129,6 +166,8 @@ class MediaUpload extends SpatieMediaLibraryFileUpload
         parent::setUp();
 
         $this->dedupScope = config('filament-media.default_dedup_scope', DedupScope::Global);
+
+        static::applyConfiguredConversion($this);
 
         if ($this->dedupEnabled) {
             $this->configureDeduplicatedUploads();

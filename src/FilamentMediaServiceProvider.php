@@ -12,6 +12,7 @@ use Joranski\FilamentMedia\Console\Commands\ReconcileBlobCountsCommand;
 use Joranski\FilamentMedia\Contracts\BlobHasher;
 use Joranski\FilamentMedia\Contracts\MediaDeduplicator;
 use Joranski\FilamentMedia\Models\MediaBlob;
+use Joranski\FilamentMedia\Filament\Components\MediaUpload;
 use Joranski\FilamentMedia\Observers\MediaObserver;
 use Joranski\FilamentMedia\Services\DeduplicationService;
 use Joranski\FilamentMedia\Services\Hashers\StreamingSha256Hasher;
@@ -53,5 +54,9 @@ class FilamentMediaServiceProvider extends PackageServiceProvider
         });
 
         EditorAttachmentMacros::register();
+
+        if (config('filament-media.panel_defaults.enabled', true)) {
+            MediaUpload::configurePanelDefaults();
+        }
     }
 }

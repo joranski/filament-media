@@ -63,9 +63,9 @@ class DeduplicationService implements MediaDeduplicator
             ->addMediaFromDisk($blob->path, $blob->disk)
             ->preservingOriginal()
             ->withCustomProperties($customProperties)
+            ->withProperties(['blob_id' => $blob->id])
             ->toMediaCollection($collection);
 
-        $media->forceFill(['blob_id' => $blob->id])->save();
         $blob->increment('reference_count');
 
         return $media->refresh();

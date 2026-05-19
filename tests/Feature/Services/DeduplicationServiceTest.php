@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Joranski\FilamentMedia\Contracts\MediaDeduplicator;
 use Joranski\FilamentMedia\Enums\DedupScope;
 use Joranski\FilamentMedia\Models\MediaBlob;
+use Joranski\FilamentMedia\Tests\Fixtures\ImageUploadTarget;
 use Joranski\FilamentMedia\Tests\Fixtures\UploadTarget;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -127,6 +128,24 @@ it('reuses one blob for model scope within the same parent', function (): void {
     expect(MediaBlob::query()->count())->toBe(1)
         ->and($first->blob_id)->toBe($second->blob_id)
         ->and(MediaBlob::query()->first()?->reference_count)->toBe(2);
+});
+
+it('stores image conversions under the blob directory when ingesting', function (): void {
+    $target = ImageUploadTarget::query()->create(['name' => 'Image']);
+
+    $media = app(MediaDeduplicator::class)->ingest(
+        model: $target,
+        file: UploadedFile::fake()->image('photo.jpg', 200, 200),
+        collection: 'gallery',
+        scope: DedupScope::Global,
+    );
+
+    $thumbPath = $media->getPathRelativeToRoot('thumb');
+
+    expect($media->blob_id)->not->toBeNull()
+        ->and($thumbPath)->toStartWith('blobs/')
+        ->and($thumbPath)->toContain('/conversions/')
+        ->and(Storage::disk('public')->exists($thumbPath))->toBeTrue();
 });
 
 it('decrements blob reference count when media is deleted', function (): void {
