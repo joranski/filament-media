@@ -9,6 +9,7 @@ Filament v5 file uploads with **SHA-256 content deduplication**, optional **capt
 - **Blob storage** — originals under `blobs/{shard}/…`; conversions beside them when your model defines them
 - **Captions UX** — inline or modal “Manage Captions” for multi-file fields
 - **Configurable Filament preview** — which conversion name the admin UI shows (default: `preview`, not `thumb`)
+- **High-quality conversions** — `MediaConversionDefaults::apply()` for sharper JPEG/PNG output with less aggressive compression
 
 ## Requirements
 
@@ -59,24 +60,89 @@ With `panel_defaults.enabled` (default **true**), you do **not** need a duplicat
 Define **names and pixel sizes** on each `HasMedia` model — the package does not ship fixed sizes:
 
 ```php
+use Joranski\FilamentMedia\Support\MediaConversionDefaults;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 public function registerMediaConversions(?Media $media = null): void
 {
-    $this->addMediaConversion('preview')
-        ->width(800)
-        ->height(600)
-        ->optimize()
-        ->nonQueued();
+    MediaConversionDefaults::apply(
+        $this->addMediaConversion('preview')
+            ->width(800)
+            ->height(600)
+            ->nonQueued(),
+    );
 
-    $this->addMediaConversion('large')
-        ->width(1200)
-        ->optimize()
-        ->nonQueued();
+    MediaConversionDefaults::apply(
+        $this->addMediaConversion('large')
+            ->width(1200)
+            ->nonQueued(),
+    );
 }
 ```
 
 Only conversions you register here are **generated on disk** when a file is uploaded.
+
+### 4. Image quality (recommended)
+
+Spatie’s `Conversion` class enables a **post-optimizer** by default (`jpegoptim -m85`, pngquant, …). That second pass often makes catalog images look soft or over-compressed. This package turns that off by default and raises encode quality instead.
+
+**Always call `MediaConversionDefaults::apply()`** on each conversion you register (see step 3 above). Do **not** chain `->optimize()` yourself unless you intentionally want the Spatie optimizer chain.
+
+#### Defaults (`config/filament-media.php`)
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `image.jpeg_quality` | `92` | Spatie image driver encode quality (1–100). Stock Spatie + jpegoptim was ~**85**. |
+| `image.run_post_optimizer` | `false` | When `false`, skips `config('media-library.image_optimizers')` after resize. |
+| `image.sharpen` | `8` | Light sharpen after resize (`0` = disabled). |
+| `image.keep_original_image_format` | `true` | PNG/WebP stay PNG/WebP instead of forced JPEG. |
+
+#### Environment variables
+
+```env
+FILAMENT_MEDIA_JPEG_QUALITY=92
+FILAMENT_MEDIA_RUN_POST_OPTIMIZER=false
+FILAMENT_MEDIA_SHARPEN=8
+FILAMENT_MEDIA_KEEP_ORIGINAL_FORMAT=true
+```
+
+For maximum fidelity (larger files): use `FILAMENT_MEDIA_JPEG_QUALITY=95` and keep `FILAMENT_MEDIA_RUN_POST_OPTIMIZER=false`.
+
+#### Per-conversion override
+
+```php
+MediaConversionDefaults::apply(
+    $this->addMediaConversion('thumb')->width(300)->height(300)->nonQueued(),
+    overrides: ['jpeg_quality' => 88, 'sharpen' => 5],
+);
+```
+
+#### Optional: gentler post-optimizer (host app)
+
+If you set `image.run_post_optimizer` to `true`, soften the tools in **`config/media-library.php`** (not in this package):
+
+```php
+// config/media-library.php — image_optimizers
+Jpegoptim::class => [
+    '-m92', // not -m85
+    '--force',
+    '--strip-all',
+    '--all-progressive',
+],
+Cwebp::class => [
+    '-m 6',
+    '-pass 10',
+    '-mt',
+    '-q 95', // not -q 90
+],
+```
+
+#### What is *not* recompressed
+
+- **Original blob** — stored once under `blobs/…`; unchanged by conversions.
+- **Filament “Manage Captions”** preview — uses `$media->getUrl()` (original).
+
+Only **derived** conversion files (`preview`, `large`, …) use these settings. Re-upload or run `php artisan media-library:regenerate` to refresh existing catalog images.
 
 ## Quick start
 
@@ -240,6 +306,10 @@ MediaUpload::configureUsing(function (MediaUpload $component): void {
 | `captions.default_ux` | `auto` | |
 | `captions.inline_max_files` | `3` | |
 | `gc.grace_days` | `7` | Before blob delete |
+| `image.jpeg_quality` | `92` | Conversion encode quality |
+| `image.run_post_optimizer` | `false` | Spatie `image_optimizers` pass |
+| `image.sharpen` | `8` | Post-resize sharpen |
+| `image.keep_original_image_format` | `true` | Preserve PNG/WebP |
 
 Environment variables:
 
@@ -247,6 +317,9 @@ Environment variables:
 FILAMENT_MEDIA_DEFAULT_CONVERSION=preview
 FILAMENT_MEDIA_PANEL_DEFAULTS=true
 FILAMENT_MEDIA_DEDUP=true
+FILAMENT_MEDIA_JPEG_QUALITY=92
+FILAMENT_MEDIA_RUN_POST_OPTIMIZER=false
+FILAMENT_MEDIA_SHARPEN=8
 ```
 
 ## Troubleshooting
@@ -271,6 +344,23 @@ Ensure `blob_id` is set before conversions run (package ≥ 0.1.3). Regenerate: 
 composer update joranski/filament-media
 php artisan migrate
 ```
+
+### Images look soft or over-compressed
+
+1. Use `MediaConversionDefaults::apply()` and remove bare `->optimize()` from conversions.
+2. Confirm `FILAMENT_MEDIA_RUN_POST_OPTIMIZER=false`.
+3. Raise `FILAMENT_MEDIA_JPEG_QUALITY` (e.g. `95`).
+4. Regenerate: `php artisan media-library:regenerate`.
+
+## Changelog (recent)
+
+| Tag | Highlights |
+|-----|------------|
+| **v0.1.5** | `MediaConversionDefaults` — higher JPEG quality, optional sharpen, post-optimizer off by default |
+| **v0.1.4** | Default Filament preview `preview`; `configurePanelDefaults()` |
+| **v0.1.3** | Fix conversion paths (`blob_id` before Spatie generates files) |
+| **v0.1.2** | Auto-load package migrations |
+| **v0.1.1** | Fix `->dedup()` when chained after `make()` |
 
 ## License
 

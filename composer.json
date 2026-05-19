@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "joranski/filament-media",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Filament media uploads with content-hash deduplication, scoped sharing, and captions",
     "keywords": [
         "laravel",

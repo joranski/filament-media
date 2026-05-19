@@ -67,4 +67,25 @@ return [
         'openable' => true,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Image conversion quality (Spatie registerMediaConversions)
+    |--------------------------------------------------------------------------
+    |
+    | Applied via MediaConversionDefaults::apply() on each addMediaConversion().
+    | Spatie's default optimizer chain uses jpegoptim -m85 (quite aggressive).
+    |
+    | - jpeg_quality: 1–100 for the image driver encode step (92–95 = high quality)
+    | - run_post_optimizer: run config('media-library.image_optimizers') after resize
+    | - sharpen: light sharpen after resize (0 = off)
+    | - keep_original_image_format: avoid forcing JPEG when source is PNG/WebP
+    |
+    */
+    'image' => [
+        'jpeg_quality' => (int) env('FILAMENT_MEDIA_JPEG_QUALITY', 92),
+        'run_post_optimizer' => (bool) env('FILAMENT_MEDIA_RUN_POST_OPTIMIZER', false),
+        'sharpen' => (float) env('FILAMENT_MEDIA_SHARPEN', 8),
+        'keep_original_image_format' => (bool) env('FILAMENT_MEDIA_KEEP_ORIGINAL_FORMAT', true),
+    ],
+
 ];
