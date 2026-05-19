@@ -43,6 +43,8 @@ class MediaUpload extends SpatieMediaLibraryFileUpload
             $this->dedupScope = config('filament-media.default_dedup_scope', DedupScope::Global);
         }
 
+        $this->configureDeduplicatedUploads();
+
         return $this;
     }
 
@@ -54,6 +56,10 @@ class MediaUpload extends SpatieMediaLibraryFileUpload
     public function captions(bool | Closure $condition = true): static
     {
         $this->captionsEnabled = (bool) $this->evaluate($condition);
+
+        if ($this->captionsEnabled) {
+            $this->configureCaptions();
+        }
 
         return $this;
     }

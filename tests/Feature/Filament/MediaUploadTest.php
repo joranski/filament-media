@@ -2,13 +2,44 @@
 
 declare(strict_types=1);
 
+use Filament\Forms\Components\BaseFileUpload;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Joranski\FilamentMedia\Contracts\MediaDeduplicator;
 use Joranski\FilamentMedia\Enums\CaptionUx;
 use Joranski\FilamentMedia\Enums\DedupScope;
 use Joranski\FilamentMedia\Filament\Components\MediaUpload;
 use Joranski\FilamentMedia\Models\MediaBlob;
 use Joranski\FilamentMedia\Tests\Fixtures\UploadTarget;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+/**
+ * @return list<string>
+ */
+function mediaUploadBlobPaths(): array
+{
+    return array_values(array_filter(
+        \Illuminate\Support\Facades\Storage::disk('public')->allFiles(),
+        static fn (string $path): bool => str_starts_with($path, 'blobs/'),
+    ));
+}
+
+/**
+ * @return Closure|null
+ */
+function mediaUploadSaveHandler(MediaUpload $component): ?Closure
+{
+    $property = new ReflectionProperty(BaseFileUpload::class, 'saveUploadedFileUsing');
+    $property->setAccessible(true);
+
+    return $property->getValue($component);
+}
+
+beforeEach(function (): void {
+    Storage::fake('public');
+    Storage::fake('tmp-for-tests');
+});
 
 it('exposes dedup and caption configuration fluently', function (): void {
     $component = MediaUpload::make('media')
@@ -29,6 +60,38 @@ it('dedupLocally sets model scope', function (): void {
     $component = MediaUpload::make('documents')->dedupLocally();
 
     expect($component->getDedupScope())->toBe(DedupScope::Model);
+});
+
+it('registers deduplicated save handler when dedup is chained after make', function (): void {
+    $handlerWithoutDedup = mediaUploadSaveHandler(MediaUpload::make('media'));
+    $handlerWithDedup = mediaUploadSaveHandler(MediaUpload::make('media')->dedup());
+
+    expect($handlerWithDedup)->not->toBe($handlerWithoutDedup);
+
+    $target = UploadTarget::query()->create(['name' => 'Product']);
+    $payload = 'identical-image-bytes';
+
+    $storeTemporaryUpload = function (string $filename) use ($payload): TemporaryUploadedFile {
+        Storage::disk('tmp-for-tests')->put('livewire-tmp/'.$filename, $payload);
+
+        return new TemporaryUploadedFile($filename, 'tmp-for-tests');
+    };
+
+    $component = MediaUpload::make('media')
+        ->collection('product-images')
+        ->dedup()
+        ->disk('public');
+
+    $handler = mediaUploadSaveHandler($component);
+
+    $firstUuid = $handler($component, $storeTemporaryUpload('first.jpg'), $target);
+    $secondUuid = $handler($component, $storeTemporaryUpload('second.jpg'), $target);
+
+    expect($firstUuid)->not->toBeNull()
+        ->and($secondUuid)->toBe($firstUuid)
+        ->and(Media::query()->count())->toBe(1)
+        ->and(MediaBlob::query()->count())->toBe(1)
+        ->and(mediaUploadBlobPaths())->toHaveCount(1);
 });
 
 it('ingests uploads through the deduplicator when dedup is enabled', function (): void {
